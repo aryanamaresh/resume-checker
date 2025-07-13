@@ -1,0 +1,85 @@
+pip install pandas numpy scikit-learn PyMuPDF
+import fitz  # PyMuPDF
+import os
+import re
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+
+# Sample training data (simulate good and bad resumes)
+data = {
+    "resume": [
+        "Experienced data scientist with Python, SQL, machine learning, and deep learning. Worked on NLP, TensorFlow, and Keras. Team collaboration, Git, and cloud deployment.",
+        "Internship in marketing. Good communication. Interested in sales. Learning Excel. Quick learner.",
+        "Python developer with 2 years experience in Django, Flask. Built web applications and REST APIs. Familiar with MongoDB, Docker, GitHub.",
+        "Student in commerce. Passionate about finance. No prior experience. Learning MS Word.",
+        "Machine learning engineer with Kaggle experience, scikit-learn, pandas, NumPy, and model optimization. Strong mathematical background.",
+    ],
+    "ats_score": [95, 40, 85, 30, 90]  # Simulated ATS scores out of 100
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Vectorization
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(df['resume'])
+y = df['ats_score']
+
+# Train a simple regression model
+model = LogisticRegression()
+model.fit(X, y > 80)  # Classification: Good (1) or Needs Improvement (0)
+
+# --- Resume Extraction Function ---
+def extract_text_from_pdf(pdf_path):
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text
+
+# --- Suggestion Logic ---
+def generate_suggestions(text):
+    suggestions = []
+
+    keywords = {
+        "Python": "Add Python experience or certification.",
+        "machine learning": "Include ML projects or tools (like scikit-learn, TensorFlow).",
+        "SQL": "Mention SQL knowledge or database experience.",
+        "Git": "Add Git/GitHub usage.",
+        "communication": "Mention teamwork or communication skills.",
+        "cloud": "Include any AWS, Azure, or GCP experience.",
+        "NLP": "Highlight NLP projects if applicable."
+    }
+
+    for word, tip in keywords.items():
+        if word.lower() not in text.lower():
+            suggestions.append(tip)
+
+    if not suggestions:
+        suggestions.append("Resume is well-optimized for ATS!")
+
+    return suggestions
+
+# --- Main Function ---
+def check_resume_ats(pdf_path):
+    if not os.path.exists(pdf_path):
+        print("File not found.")
+        return
+
+    text = extract_text_from_pdf(pdf_path)
+    features = vectorizer.transform([text])
+    prediction = model.predict(features)[0]
+    probability = model.predict_proba(features)[0][1] * 100
+
+    print("\n📝 Resume ATS Score:", round(probability, 2), "%")
+    if prediction:
+        print("✅ Your resume is likely ATS compatible.\n")
+    else:
+        print("⚠️ Resume needs improvement. Suggestions:")
+        for suggestion in generate_suggestions(text):
+            print(" -", suggestion)
+
+# --- Example Usage ---
+resume_path = "sample_resume.pdf"  # Replace with actual path
+check_resume_ats(resume_path)
